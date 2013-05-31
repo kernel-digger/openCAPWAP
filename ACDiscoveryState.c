@@ -96,6 +96,14 @@ CWBool CWAssembleDiscoveryResponse(CWProtocolMessage **messagesPtr, int seqNum) 
 				 CW_PACKET_PLAIN);
 }
 
+/*
+解析ap发来的discover报文
+
+@msg	:
+@len	:
+@seqNumPtr	: 指针记录
+@valuesPtr	:
+*/
 CWBool CWParseDiscoveryRequestMessage(char *msg, 
 				      int len,
 				      int *seqNumPtr,

@@ -853,6 +853,12 @@ CWBool CWProtocolParseFragment(char *buf, int readBytes, CWList *fragmentsListPt
 }
 
 // Parse Transport Header
+/*
+RFC5415 - 4.3.  CAPWAP Header
+
+8个字节
+
+*/
 CWBool CWParseTransportHeader(CWProtocolMessage *msgPtr, CWProtocolTransportHeaderValues *valuesPtr, CWBool *dataFlagPtr, char *RadioMAC) {
 	
 	int transport4BytesLen; 
@@ -867,34 +873,49 @@ CWBool CWParseTransportHeader(CWProtocolMessage *msgPtr, CWProtocolTransportHead
 	//CWDebugLog("Parse Transport Header");
 	val = CWProtocolRetrieve32(msgPtr);
 	
+	/* 前4个bit版本号 */
 	if(CWGetField32(val, CW_TRANSPORT_HEADER_VERSION_START, CW_TRANSPORT_HEADER_VERSION_LEN) != CW_PROTOCOL_VERSION)
 		return CWErrorRaise(CW_ERROR_INVALID_FORMAT, "Wrong Protocol Version");
 		
 	version = CWGetField32(val, CW_TRANSPORT_HEADER_VERSION_START, CW_TRANSPORT_HEADER_VERSION_LEN);
 	CWDebugLog("VERSION: %d", version);
 	
+	/* 负载类型，0 - CAPWAP Header, 1 - CAPWAP DTLS Header */
 	valuesPtr->payloadType = CWGetField32(val, CW_TRANSPORT_HEADER_TYPE_START, CW_TRANSPORT_HEADER_TYPE_LEN);
 	CWDebugLog("PAYLOAD TYPE: %d", valuesPtr->payloadType);
 	
-	
+	/* 头部长度，4字节单位 */
 	transport4BytesLen = CWGetField32(val,	CW_TRANSPORT_HEADER_HLEN_START, CW_TRANSPORT_HEADER_HLEN_LEN);
 	CWDebugLog("HLEN: %d", transport4BytesLen);	
 
+	/* radio id */
 	rid = CWGetField32(val, CW_TRANSPORT_HEADER_RID_START, CW_TRANSPORT_HEADER_RID_LEN);
 	CWDebugLog("RID: %d", rid);	
 	
+	/* wireless binding identifier无线绑定标识，1 - IEEE 802.11 */
 	CWDebugLog("WBID: %d", CWGetField32(val, CW_TRANSPORT_HEADER_WBID_START, CW_TRANSPORT_HEADER_WBID_LEN));
 	
+	/*
+	T: The Type 'T' bit indicates the format of the frame being
+	      transported in the payload.  When this bit is set to one (1), the
+	      payload has the native frame format indicated by the WBID field.
+	      When this bit is zero (0), the payload is an IEEE 802.3 frame.
+	*/
 	valuesPtr->type = CWGetField32(val, CW_TRANSPORT_HEADER_T_START, CW_TRANSPORT_HEADER_T_LEN);
 	CWDebugLog("TYPE: %d", valuesPtr->type);
 	//CWDebugLog("TYPE: %d", valuesPtr->type);
 	
+	/* 1表示分片报文 */
 	valuesPtr->isFragment = CWGetField32(val, CW_TRANSPORT_HEADER_F_START, CW_TRANSPORT_HEADER_F_LEN);
 	//CWDebugLog("IS FRAGMENT: %d", valuesPtr->isFragment);
 
+	/* 1表示是分片报文的最后一个 */
 	valuesPtr->last = CWGetField32(val, CW_TRANSPORT_HEADER_L_START, CW_TRANSPORT_HEADER_L_LEN);
 	//CWDebugLog("NOT LAST: %d", valuesPtr->last);
 	
+	/* (optional) Wireless Specific Information
+	   1表示头部后包含可选的无线信息
+	*/
 	optionalWireless = CWGetField32(val, CW_TRANSPORT_HEADER_W_START, CW_TRANSPORT_HEADER_W_LEN);
 //	CWDebugLog("OPTIONAL WIRELESS: %d", optionalWireless);
 	m = CWGetField32(val, CW_TRANSPORT_HEADER_M_START, CW_TRANSPORT_HEADER_M_LEN);
@@ -905,12 +926,15 @@ CWBool CWParseTransportHeader(CWProtocolMessage *msgPtr, CWProtocolTransportHead
 
 	val = CWProtocolRetrieve32(msgPtr);
 
+	/* 分片id */
 	valuesPtr->fragmentID = CWGetField32(val, CW_TRANSPORT_HEADER_FRAGMENT_ID_START, CW_TRANSPORT_HEADER_FRAGMENT_ID_LEN);
 //	CWDebugLog("FRAGMENT_ID: %d", valuesPtr->fragmentID);
 
+	/* 分片偏移，8字节单位 */
 	valuesPtr->fragmentOffset = CWGetField32(val, CW_TRANSPORT_HEADER_FRAGMENT_OFFSET_START, CW_TRANSPORT_HEADER_FRAGMENT_OFFSET_LEN);
 //	CWDebugLog("FRAGMENT_OFFSET: %d", valuesPtr->fragmentOffset);
 
+	/* 检查头部中是否含有可选的无线信息 */
 	valuesPtr->bindingValuesPtr = NULL;
 
 	

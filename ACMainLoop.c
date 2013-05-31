@@ -72,6 +72,9 @@ void CWACEnterMainLoop() {
          *
          * 20/10/2009 - Donato Capitella 
          */
+	/* 清空需要屏蔽的信号集
+	   即执行信号处理函数时，没有特别的需要屏蔽的信号
+	*/
         sigemptyset(&act.sa_mask);
 
 	act.sa_flags = 0;
@@ -99,12 +102,17 @@ void CWACEnterMainLoop() {
 		exit(1);
 	}
 
+	/* 主进程的主循环
+	   接收报文
+	*/
 	CW_REPEAT_FOREVER {
 		/* CWACManageIncomingPacket will be called 
 		 * when a new packet is ready to be read 
 		 */
+		/* 用普通的socket接收报文 */
 		if(!CWErr(CWNetworkUnsafeMultiHomed(&gACSocket, 
 						    CWACManageIncomingPacket,
+						    /* 不使用MSG_PEEK方式 */
 						    CW_FALSE)))
 			exit(1);
 	}
@@ -112,8 +120,11 @@ void CWACEnterMainLoop() {
 
 /* argument passed to the thread func */
 typedef struct {
+	/* 在全局变量gWTPs[]数组中的下标 */
 	int index;
+	/* socket */
 	CWSocket sock;
+	/* 在全局变量@gACSocket.interfaces[]数组中的下标 */
 	int interfaceIndex;
 } CWACThreadArg;
 
@@ -144,12 +155,16 @@ void CWACManageIncomingPacket(CWSocket sock,
 	/* check if sender address is known */
 	wtpPtr = CWWTPByAddress(addrPtr, sock);
 	
+	/* ap已经在线 */
 	if(wtpPtr != NULL) {
 		/* known WTP */
 		/* Clone data packet */
+		/* 创建缓存空间 */
 		CW_CREATE_OBJECT_SIZE_ERR(pData, readBytes, { CWLog("Out Of Memory"); return; });
+		/* 复制数据 */
 		memcpy(pData, buf, readBytes);
 
+		/* 将接收到的数据加入ap线程的接收链表 */
 		CWLockSafeList(wtpPtr->packetReceiveList);
 		CWAddElementToSafeListTailwitDataFlag(wtpPtr->packetReceiveList, pData, readBytes,dataFlag);
 		CWUnlockSafeList(wtpPtr->packetReceiveList);		
@@ -164,6 +179,7 @@ void CWACManageIncomingPacket(CWSocket sock,
 		tmp = gActiveWTPs;
 		CWThreadMutexUnlock(&gActiveWTPsMutex);
 
+		/* 已经达到ap数量上限 */
 		if(gActiveWTPs >= gMaxWTPs) {
 
 			CWLog("Too many WTPs");
@@ -171,6 +187,7 @@ void CWACManageIncomingPacket(CWSocket sock,
 		}
 		CWLog("\n");	
 		
+		/* 未创建线程的ap都认为其是discover报文 */
 		if(CWErr(CWParseDiscoveryRequestMessage(buf, readBytes, &seqNum, &values))) {
 		
 			CWProtocolMessage *msgPtr;
@@ -222,8 +239,10 @@ void CWACManageIncomingPacket(CWSocket sock,
 			
 			if(!CWErr(CWThreadMutexLock(&gWTPsMutex))) exit(1);
 			/* look for the first free slot */
+			/* 找一个未使用的数组下标 */
 			for(i = 0; i < gMaxWTPs && gWTPs[i].isNotFree; i++);
 	
+			/* 记录ap的ip地址和端口号 */
 			CW_COPY_NET_ADDR_PTR(&(gWTPs[i].address), addrPtr);
 			gWTPs[i].isNotFree = CW_TRUE;
 			gWTPs[i].isRequestClose = CW_FALSE;
@@ -239,6 +258,7 @@ void CWACManageIncomingPacket(CWSocket sock,
 				return;
 			}
 			
+			/* 设置链表使用的锁和条件等待变量指针 */
 			CWSetMutexSafeList(gWTPs[i].packetReceiveList, 
 					   &gWTPs[i].interfaceMutex);
 			CWSetConditionSafeList(gWTPs[i].packetReceiveList,
@@ -269,6 +289,7 @@ void CWACManageIncomingPacket(CWSocket sock,
 			if (argPtr->interfaceIndex < 0) argPtr->interfaceIndex = 0; 
 			
 			/* create the thread that will manage this WTP */
+			/* 创建ap对应的线程 */
 			if(!CWErr(CWCreateThread(&(gWTPs[i].thread), CWManageWTP, argPtr))) {
 
 				CW_FREE_OBJECT(argPtr);
@@ -331,6 +352,9 @@ __inline__ CWWTPManager *CWWTPByAddress(CWNetworkLev4Address *addressPtr, CWSock
  * Session's thread function: each thread will manage a single session 
  * with one WTP.
  */
+/*
+每一台ap对应一个管理线程
+*/
 CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 
 	int 		i = ((CWACThreadArg*)arg)->index;
@@ -339,6 +363,7 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 	
 	CW_FREE_OBJECT(arg);
 	
+	/* 使用线程键记录该线程对应ap在全局数组gWTPs[]中的下标 */
 	if(!(CWThreadSetSpecific(&gIndexSpecific, &i))) {
 
 		CWLog("Critical Error with Thread Data");
@@ -348,9 +373,12 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 	if(!CWErr(CWThreadMutexLock(&gActiveWTPsMutex))) 
 		exit(1);
 
+	/* 记录所有ap的总数 */
 	gActiveWTPs++;
 
+	/* 记录接口上的ap总数 */
 	gInterfaces[interfaceIndex].WTPCount++;
+	/* 打印接口ip地址 */
 	CWUseSockNtop(((struct sockaddr*) &(gInterfaces[interfaceIndex].addr)),
 				  CWDebugLog("One more WTP on %s (%d)", str, interfaceIndex);
 				  );
@@ -364,6 +392,7 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 	
 	gWTPs[i].fragmentsList = NULL;
 	/* we're in the join state for this session */
+	/* 线程创建时，ap为join状态 */
 	gWTPs[i].currentState = CW_ENTER_JOIN;
 	gWTPs[i].subState = CW_DTLS_HANDSHAKE_IN_PROGRESS;
 	
@@ -430,28 +459,35 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 
 		CWThreadMutexLock(&gWTPs[i].interfaceMutex);
 
+		/* 没有要求结束线程 */
 		while ((gWTPs[i].isRequestClose == CW_FALSE) &&
+			/* 接收链表中没有数据 */
 		       (CWGetCountElementFromSafeList(gWTPs[i].packetReceiveList) == 0) &&
+			/* 没有需要主动发送给ap的命令 */
 		       (gWTPs[i].interfaceCommand == NO_CMD)) {
 
 			 /*TODO: Check system */
+			/* 线程条件等待 */
 			CWWaitThreadCondition(&gWTPs[i].interfaceWait, 
 					      &gWTPs[i].interfaceMutex);
 		}
 
 		CWThreadMutexUnlock(&gWTPs[i].interfaceMutex);
 
+		/* 要求结束线程 */
 		if (gWTPs[i].isRequestClose) {
 
 			CWLog("Request close thread");
 			_CWCloseThread(i);
 		}
 
+		/* 处理报文前先阻塞这2个信号 */
 		CWThreadSetSignals(SIG_BLOCK, 
 				   2,
 				   CW_SOFT_TIMER_EXPIRED_SIGNAL,
 				   CW_CRITICAL_TIMER_EXPIRED_SIGNAL);
 
+		/* 处理接收到的报文 */
 		if (CWGetCountElementFromSafeList(gWTPs[i].packetReceiveList) > 0) {
 
 			CWBool 	bCrypt = CW_FALSE;
@@ -461,12 +497,15 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 			pBuffer = (char *)CWGetHeadElementFromSafeList(gWTPs[i].packetReceiveList, NULL);
 			
 			
+
+			/* 检查CAPWAP Preamble中的Type */
 			if (((pBuffer[0] & 0x0f) == CW_PACKET_CRYPT) && ((gWTPs[i].buf[0] & 0x0f) == CW_PACKET_CRYPT))
 			  bCrypt = CW_TRUE;
 
 			
 			CWThreadMutexUnlock(&gWTPs[i].interfaceMutex);
 
+			/* 如果是加密的 */
 			if (bCrypt) {
 
 
@@ -482,11 +521,14 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 				continue;
 			  }
 			  
+			/* 不是加密数据 */
 			} else {
 			  CWThreadMutexLock(&gWTPs[i].interfaceMutex);
+			  /* 取数据，移除节点 */
 			  pBuffer = (char*)CWRemoveHeadElementFromSafeListwithDataFlag(gWTPs[i].packetReceiveList, &readBytes,&dataFlag);
 			  CWThreadMutexUnlock(&gWTPs[i].interfaceMutex);
 			  
+			/* 报文数据复制到线程buf中 */
 			  memcpy(gWTPs[i].buf, pBuffer, readBytes);
 			  CW_FREE_OBJECT(pBuffer);
 			}
@@ -574,6 +616,7 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 					}
 					break;
 				}	
+				/* ap当前在run状态 */
 				case CW_ENTER_RUN:
 				{
 					if(!ACEnterRun(i, &msg, dataFlag)) 
@@ -603,6 +646,7 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 			}
 			CW_FREE_PROTOCOL_MESSAGE(msg);
 		}
+		/* 处理主动控制ap的命令 */
 		else {
 
 		  CWThreadMutexLock(&gWTPs[i].interfaceMutex);
@@ -717,6 +761,7 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 			}
 			CWThreadMutexUnlock(&gWTPs[i].interfaceMutex);
 		}
+		/* 报文处理结束，当前线程不阻塞这2个信号 */
 		CWThreadSetSignals(SIG_UNBLOCK, 2, 
 				   CW_SOFT_TIMER_EXPIRED_SIGNAL, 
 				   CW_CRITICAL_TIMER_EXPIRED_SIGNAL);
@@ -725,6 +770,7 @@ CW_THREAD_RETURN_TYPE CWManageWTP(void *arg) {
 
 void _CWCloseThread(int i) {
 
+	/* 线程结束处理中，不再需要接收信号 */
  	CWThreadSetSignals(SIG_BLOCK, 2, 
 			   CW_SOFT_TIMER_EXPIRED_SIGNAL, 
 			   CW_CRITICAL_TIMER_EXPIRED_SIGNAL);
@@ -737,6 +783,7 @@ void _CWCloseThread(int i) {
 	if(!CWErr(CWThreadMutexLock(&gActiveWTPsMutex))) 
 		exit(1);
 	
+	/* ap计数减1 */
 	gInterfaces[gWTPs[i].interfaceIndex].WTPCount--;
 	gActiveWTPs--;
 	
@@ -780,6 +827,7 @@ void _CWCloseThread(int i) {
 	gWTPs[i].isNotFree = CW_FALSE;
 	CWThreadMutexUnlock(&gWTPsMutex);
 	
+	/* 线程结束 */
 	CWExitThread();
 }
 
@@ -796,6 +844,10 @@ void CWCloseThread() {
 	_CWCloseThread(*iPtr);
 }
 
+/*
+心跳检测超时
+关闭ap线程
+*/
 void CWCriticalTimerExpiredHandler(int arg) {
 
 	int *iPtr;
@@ -822,10 +874,16 @@ void CWCriticalTimerExpiredHandler(int arg) {
 	CWSignalThreadCondition(&gWTPs[*iPtr].interfaceWait);
 }
 
+/*
+控制报文重传
+
+@arg	: 未使用
+*/
 void CWSoftTimerExpiredHandler(int arg) {
 
 	int *iPtr;
 
+	/* 重传处理过程中阻塞2个信号 */
 	CWThreadSetSignals(SIG_BLOCK, 2, 
 			   CW_SOFT_TIMER_EXPIRED_SIGNAL,
 			   CW_CRITICAL_TIMER_EXPIRED_SIGNAL);
@@ -833,6 +891,7 @@ void CWSoftTimerExpiredHandler(int arg) {
 	CWDebugLog("Soft Timer Expired for Thread: %08x", 
 		   (unsigned int)CWThreadSelf());
 	
+	/* 取线程键中记录的每个线程对应ap的gWTPs[]下标 */
 	if((iPtr = ((int*)CWThreadGetSpecific(&gIndexSpecific))) == NULL) {
 
 		CWLog("Error Handling Soft timer");
@@ -842,6 +901,7 @@ void CWSoftTimerExpiredHandler(int arg) {
 		return;
 	}
 	
+	/* 没有报文需要重传 */
 	if((!gWTPs[*iPtr].isRetransmitting) || (gWTPs[*iPtr].messages == NULL)) {
 
 		CWDebugLog("Soft timer expired but we are not retransmitting");
@@ -855,17 +915,20 @@ void CWSoftTimerExpiredHandler(int arg) {
 	
 	CWDebugLog("Retransmission Count increases to %d", gWTPs[*iPtr].retransmissionCount);
 	
+	/* 达到重传次数上限 */
 	if(gWTPs[*iPtr].retransmissionCount >= gCWMaxRetransmit) 
 	{
 		CWDebugLog("Peer is Dead");
 		/* ?? _CWCloseThread(*iPtr);
 		 * Request close thread
 		 */
+		/* 标记线程应该结束 */
 		gWTPs[*iPtr].isRequestClose = CW_TRUE;
 		CWSignalThreadCondition(&gWTPs[*iPtr].interfaceWait);
 		return;
 	}
 
+	/* 发送重传报文 */
 	if(!CWErr(CWACResendAcknowledgedPacket(*iPtr))) {
 		_CWCloseThread(*iPtr);
 	}

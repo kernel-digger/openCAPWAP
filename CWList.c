@@ -34,6 +34,10 @@
 
 // adds an element at the head of the list
 // CW_TRUE if the operation is successful, CW_FALSE otherwise
+/*
+@list	:
+@element	: 存放在链表节点的data字段
+*/
 CWBool CWAddElementToList(CWList *list, void *element) {
 	CWListElement *newElem;
 	
@@ -156,6 +160,10 @@ void *CWDeleteInList(CWList *list, void *baseElement, CWBool (*compareFunc) (voi
 }
 
 // deletes a list, deleting each element with a call to the given deleteFunc
+/*
+清空链表
+对每一个节点的data字段调用deleteFunc函数
+*/
 void CWDeleteList(CWList *list , void (*deleteFunc) (void *)) {
 	CWListElement *el = NULL;
 	

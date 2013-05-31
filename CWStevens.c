@@ -191,6 +191,7 @@ struct ifi_info* get_ifi_info(int family, int doaliases)
 		buf = (char*)malloc(len);
 		ifc.ifc_len = len;
 		ifc.ifc_buf = buf;
+		/* 获取所有接口的清单 */
 		if (ioctl(sockfd, SIOCGIFCONF, &ifc) >= 0) {
 			if (ifc.ifc_len == lastlen)
 				break;		/* success, len has not changed */
@@ -204,9 +205,12 @@ struct ifi_info* get_ifi_info(int family, int doaliases)
 	lastname[0] = 0;
 	sdlname = NULL;
 
+	/* 遍历获取到的接口列表 */
 	for (ptr = buf; ptr < buf + ifc.ifc_len; ) {
+		/* buf是多个struct ifreq结构体数组 */
 		ifr = (struct ifreq *) ptr;
 
+		/* 计算地址长度 */
 #ifdef	HAVE_SOCKADDR_SA_LEN
 		len = max(sizeof(struct sockaddr), ifr->ifr_addr.sa_len);
 #else
@@ -222,6 +226,7 @@ struct ifi_info* get_ifi_info(int family, int doaliases)
 			break;
 		}
 #endif	/* HAVE_SOCKADDR_SA_LEN */
+		/* 指向数组中的下一个结构 */
 		ptr += sizeof(ifr->ifr_name) + len;	/* for next one in buffer */
 
 #ifdef	HAVE_SOCKADDR_DL_STRUCT
@@ -235,15 +240,18 @@ struct ifi_info* get_ifi_info(int family, int doaliases)
 		}
 #endif
 
+		/* 跳过不关心的协议族 */
 		if (ifr->ifr_addr.sa_family != family)
 			continue;	/* ignore if not desired address family */
 
+		/* 处理接口别名 */
 		if ( (cptr = strchr(ifr->ifr_name, ':')) != NULL)
 			*cptr = 0;		/* replace colon with null */
 		if (strncmp(lastname, ifr->ifr_name, IFNAMSIZ) == 0) {
 			if (doaliases == 0)
 				continue;	/* already processed this interface */
 		}
+		/* 记录当前读取的接口名称 */
 		memcpy(lastname, ifr->ifr_name, IFNAMSIZ);
 
 		ifrcopy = *ifr;
@@ -252,6 +260,7 @@ struct ifi_info* get_ifi_info(int family, int doaliases)
 		if ((flags & IFF_UP) == 0)
 			continue;	/* ignore if interface not up */
 
+		/* 创建链表节点 */
 		ifi = (struct ifi_info*)calloc(1, sizeof(struct ifi_info));
 		*ifipnext = ifi;			/* prev points to this new one */
 		ifipnext = &ifi->ifi_next;	/* pointer to next one goes here */
@@ -264,6 +273,7 @@ struct ifi_info* get_ifi_info(int family, int doaliases)
 			idx = 0;
 		ifi->ifi_index = idx;
 
+		/* 复制socket套接口地址 */
 		switch (ifr->ifr_addr.sa_family) {
 		case AF_INET:
 			sinptr = (struct sockaddr_in *) &ifr->ifr_addr;

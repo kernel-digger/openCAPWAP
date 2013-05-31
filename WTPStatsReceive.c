@@ -25,6 +25,9 @@
 
 #include "WTPStatsReceive.h"
 
+/*
+把@buffer转换为使用CWProtocolMessage的格式保存
+*/
 int create_data_Frame(CWProtocolMessage** frame, char* buffer, int len)	
 {
 	

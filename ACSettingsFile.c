@@ -40,6 +40,9 @@
 
 
 FILE* gSettingsFile=NULL;
+/*
+在CWParseSettingsFile中分配空间
+*/
 WTPQosValues* gDefaultQosValues=NULL;
 int gHostapd_port;
 char* gHostapd_unix_path;
@@ -53,15 +56,21 @@ void CWExtractValue(char* start, char** startValue, char** endValue, int* offset
 	*endValue = *startValue + *offset -1;
 }
 
+/*
+解析配置文件
+主要是qos的配置参数
+*/
 CWBool CWParseSettingsFile()
 {
 	char *line = NULL;
 		
+	/* 打开配置文件读取 */
 	gSettingsFile = fopen (CW_SETTINGS_FILE, "rb");
 	if (gSettingsFile == NULL) {
 		CWErrorRaiseSystemError(CW_ERROR_GENERAL);
 	}
 	
+	/* 为gDefaultQosValues分配空间 */
 	CW_CREATE_ARRAY_ERR(gDefaultQosValues, NUM_QOS_PROFILES, WTPQosValues, return CWErrorRaise(CW_ERROR_OUT_OF_MEMORY, NULL););
 	
 	while((line = (char*)CWGetCommand(gSettingsFile)) != NULL) 
@@ -69,6 +78,7 @@ CWBool CWParseSettingsFile()
 		char* startTag=NULL;
 		char* endTag=NULL;
 		
+		/* 关键字在<...>之间 */
 		if((startTag=strchr (line, '<'))==NULL) 
 		{
 			CW_FREE_OBJECT(line);

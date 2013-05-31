@@ -62,6 +62,12 @@ typedef struct {
 						}
 											
 #define CWErrorRaise(code, msg) 		_CWErrorRaise(code, msg, __FILE__, __LINE__)
+/*
+@arg为CW_TRUE的话，则返回CW_TRUE
+
+为CW_FALSE的话，则将@arg中CWErrorRaise的错误信息(不是CW_ERROR_SUCCESS或CW_ERROR_NONE)打印出来，
+则返回CW_FALSE(不是CW_ERROR_SUCCESS或CW_ERROR_NONE)
+*/
 #define CWErr(arg)				((arg) || _CWErrorHandleLast(__FILE__, __LINE__))
 #define CWErrorHandleLast()			_CWErrorHandleLast(__FILE__, __LINE__)
 

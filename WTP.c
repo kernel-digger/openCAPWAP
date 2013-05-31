@@ -74,6 +74,7 @@ CWSafeList 		gFrameList;
 CWSafeList 		gPacketReceiveList;
 
 /* used to synchronize access to the lists */
+/* ¿ØÖÆÁ´±ígPacketReceiveListºÍgFrameListµÄ»¥³â·ÃÎÊ */
 CWThreadCondition    gInterfaceWait;
 CWThreadMutex 		gInterfaceMutex;
 
@@ -385,6 +386,7 @@ int main (int argc, const char * argv[]) {
 	
 	CWRandomInitLib();
 
+	/* ×èÈûSIGALRMÐÅºÅ£¬Ö»ÓÐ¶¨Ê±Æ÷Ïß³Ì»áµÈ´ýSIGALRMÐÅºÅ */
 	CWThreadSetSignals(SIG_BLOCK, 1, SIGALRM);
 
 	if (timer_init() == 0) {
@@ -394,10 +396,11 @@ int main (int argc, const char * argv[]) {
 
 
 #ifdef CW_NO_DTLS
-	if( !CWErr(CWWTPLoadConfiguration()) ) {
+	if( !CWErr(CWWTPLoadConfiguration()) ) 
 #else
-	if( !CWErr(CWSecurityInitLib())	|| !CWErr(CWWTPLoadConfiguration()) ) {
+	if( !CWErr(CWSecurityInitLib())	|| !CWErr(CWWTPLoadConfiguration()) ) 
 #endif
+	{
 		CWLog("Can't start WTP");
 		exit(1);
 	}
@@ -582,7 +585,7 @@ CWBool CWWTPInitConfiguration() {
 		/* gRadiosInfo.radiosInfo[i].numEntries = 0; */
 		gRadiosInfo.radiosInfo[i].decryptErrorMACAddressList = NULL;
 		gRadiosInfo.radiosInfo[i].reportInterval= CW_REPORT_INTERVAL_DEFAULT;
-		/* Default value for CAPWAï¿½ */
+		/* Default value for CAPWAP */
 		gRadiosInfo.radiosInfo[i].adminState= ENABLED; 
 		gRadiosInfo.radiosInfo[i].adminCause= AD_NORMAL;
 		gRadiosInfo.radiosInfo[i].operationalState= DISABLED;

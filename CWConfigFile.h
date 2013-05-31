@@ -44,7 +44,11 @@ typedef struct {
 		char **str_array_value;
 	} value;
 	
+	/* 起始字符串，如<AC_MCAST_GROUPS>
+	   如果只有一行则写</AC_HW_VERSION>
+	*/
 	char *code;
+	/* 结束字符串，如</AC_MCAST_GROUPS>*/
 	char *endCode;
 	
 	int count;

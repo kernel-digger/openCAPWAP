@@ -37,6 +37,7 @@
 typedef struct {
 	CWNetworkLev4Address addr;
 	CWNetworkLev4Address addrIPv4;
+	/* ´´½¨µÄsocket */
 	CWSocket sock;
 	enum {
 		CW_PRIMARY,

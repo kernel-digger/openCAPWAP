@@ -81,6 +81,9 @@ int from_8023_to_80211( unsigned char *inbuffer,int inlen, unsigned char *outbuf
  * index given the system index of an interface managed by the given multihomed
  * socket.
  */
+/*
+根据@systemIndex返回其在@sockPtr中的数组下标
+*/
 int CWNetworkGetInterfaceIndexFromSystemIndex(CWMultiHomedSocket *sockPtr,
 					      int systemIndex) {
 	
@@ -126,6 +129,15 @@ CWMultiHomedInterface *CWNetworkGetInterfaceAlreadyStored(CWList list,
  * broadcast address + the wildcard addres + each multicast address in 
  * multicastGroups.
  */
+/*
+创建socket
+绑定地址
+
+例如
+192.168.1.1:5246
+192.168.1.255:5246
+0.0.0.0:5246
+*/
 CWBool CWNetworkInitSocketServerMultiHomed(CWMultiHomedSocket *sockPtr, 
 					   int port, 
 					   char **multicastGroups, 
@@ -152,11 +164,12 @@ CWBool CWNetworkInitSocketServerMultiHomed(CWMultiHomedSocket *sockPtr,
 	 */
 #ifdef CW_DEBUGGING
 	/* for each network interface... */
-	for (ifihead = ifi = get_ifi_info((gNetworkPreferredFamily == CW_IPv6) ? AF_INET6 : AF_INET, 1); ifi != NULL; ifi = ifi->ifi_next) { 
+	for (ifihead = ifi = get_ifi_info((gNetworkPreferredFamily == CW_IPv6) ? AF_INET6 : AF_INET, 1); ifi != NULL; ifi = ifi->ifi_next) 
 #else
 	/* for each network interface... */
-	for (ifihead = ifi = get_ifi_info((gNetworkPreferredFamily == CW_IPv6) ? AF_INET6 : AF_INET, 0); ifi != NULL; ifi = ifi->ifi_next) {
+	for (ifihead = ifi = get_ifi_info((gNetworkPreferredFamily == CW_IPv6) ? AF_INET6 : AF_INET, 0); ifi != NULL; ifi = ifi->ifi_next) 
 #endif
+	{
 		/* bind a unicast address */
 		if((sock = socket(ifi->ifi_addr->sa_family, SOCK_DGRAM, 0)) < 0) {
 
@@ -168,8 +181,10 @@ CWBool CWNetworkInitSocketServerMultiHomed(CWMultiHomedSocket *sockPtr,
 		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 		
 		/* bind address */
+		/* 设置端口号 */
 		sock_set_port_cw(ifi->ifi_addr, htons(port));
 		
+		/* socket绑定到指定地址 */
 		if(bind(sock, (struct sockaddr*) ifi->ifi_addr, CWNetworkGetAddressSize((CWNetworkLev4Address*)ifi->ifi_addr)) < 0) {
 
 			close(sock);
@@ -178,19 +193,25 @@ CWBool CWNetworkInitSocketServerMultiHomed(CWMultiHomedSocket *sockPtr,
 			/* CWNetworkRaiseSystemError(CW_ERROR_CREATING); */
 		}
 		
+		/* 打印接口地址 */
 		CWUseSockNtop(ifi->ifi_addr, 
 			      CWLog("bound %s (%d, %s)", str, ifi->ifi_index, ifi->ifi_name););
 		
 		/* store socket inside multihomed socket */
+		/* 分配结构空间 */
 		CW_CREATE_OBJECT_ERR(p, CWMultiHomedInterface, return CWErrorRaise(CW_ERROR_OUT_OF_MEMORY, NULL););
+		/* 记录socket */
 		p->sock = sock;
+		/* 还没有记录该接口，并且不是lo端口 */
 		if(CWNetworkGetInterfaceAlreadyStored(interfaceList, ifi->ifi_index) == NULL &&
 		   strncmp(ifi->ifi_name, "lo", 2)) { /* don't consider loopback an interface
 							 (even if we accept packets from loopback) */
 			CWDebugLog("Primary Address");
+			/* 标记为单播主地址 */
 			p->kind = CW_PRIMARY;
 
 		} else {
+		/* 已经有主地址记录 */
 			/* should be BROADCAST_OR_ALIAS_OR_MULTICAST_OR_LOOPBACK ;-) */
 			p->kind = CW_BROADCAST_OR_ALIAS;
 #ifdef CW_DEBUGGING
@@ -239,13 +260,16 @@ CWBool CWNetworkInitSocketServerMultiHomed(CWMultiHomedSocket *sockPtr,
 		CW_COPY_NET_ADDR_PTR(&(p->dataAddr), ifi->ifi_addr);
 		p->dataSock = sock;
 
+		/* 加入链表 */
 		if(!CWAddElementToList(&interfaceList, p)) {
 		
 			return CWErrorRaise(CW_ERROR_OUT_OF_MEMORY, NULL);
 		}
 		/* we add a socket to the multihomed socket */
+		/* 增加了一个单播地址 */
 		sockPtr->count++;	
 		
+		/* 该接口可以发送广播地址 */
 		if (ifi->ifi_flags & IFF_BROADCAST) { 
 			/* try to bind broadcast address */
 			if((sock = socket(ifi->ifi_addr->sa_family, SOCK_DGRAM, 0)) < 0) {
@@ -308,6 +332,7 @@ CWBool CWNetworkInitSocketServerMultiHomed(CWMultiHomedSocket *sockPtr,
 				return CWErrorRaise(CW_ERROR_OUT_OF_MEMORY, NULL);
 			}
 			/* we add a socket to the multihomed socket */
+			/* 增加了一个广播地址 */
 			sockPtr->count++;
 		}
 	}
@@ -315,10 +340,12 @@ CWBool CWNetworkInitSocketServerMultiHomed(CWMultiHomedSocket *sockPtr,
 	/* get_ifi_info returned an error */
 	if(ifihead == NULL) {
 
+		/* 清空链表 */
 		CWDeleteList(&interfaceList, CWNetworkDeleteMHInterface);
 		return CWErrorRaise(CW_ERROR_NEED_RESOURCE, 
 				    "Error With get_ifi_info()");
 	}
+	/* 释放链表 */
 	free_ifi_info(ifihead);
 	
 #ifdef IPV6
@@ -330,10 +357,11 @@ CWBool CWNetworkInitSocketServerMultiHomed(CWMultiHomedSocket *sockPtr,
 		 * Why? Just to increase the funny side of the thing.
 		 */
 #ifdef CW_DEBUGGING
-		for (ifihead = ifi = get_ifi_info(AF_INET, 1); ifi != NULL; ifi = ifi->ifi_next) {
+		for (ifihead = ifi = get_ifi_info(AF_INET, 1); ifi != NULL; ifi = ifi->ifi_next) 
 #else
-		for (ifihead = ifi = get_ifi_info(AF_INET, 0); ifi != NULL; ifi = ifi->ifi_next) {
+		for (ifihead = ifi = get_ifi_info(AF_INET, 0); ifi != NULL; ifi = ifi->ifi_next) 
 #endif
+		{
 			CWMultiHomedInterface *s = CWNetworkGetInterfaceAlreadyStored(interfaceList, ifi->ifi_index);
 			
 			if(s == NULL ||
@@ -398,6 +426,7 @@ success:
 		a->sin_port = htons(port);
 	}
 	
+	/* 绑定到任意地址的@port端口 */
 	if(bind(sock, (struct sockaddr*) &wildaddr, CWNetworkGetAddressSize(&wildaddr)) < 0) {
 		close(sock);
 		CWDeleteList(&interfaceList, CWNetworkDeleteMHInterface);
@@ -423,9 +452,11 @@ success:
 	if(!CWAddElementToList(&interfaceList, p)) {
 		return CWErrorRaise(CW_ERROR_OUT_OF_MEMORY, NULL);
 	}
+	/* 增加了一个通配地址 */
 	sockPtr->count++;
 
 	/* bind multicast addresses */
+	/* 配置文件中的<AC_MCAST_GROUPS>配置 */
 	for(i = 0; i < multicastGroupsCount; i++) {
 		struct addrinfo hints, *res, *ressave;
 		char serviceName[5];
@@ -496,15 +527,18 @@ success:
 	 * convert it into an array. The "interfaces" field of CWMultiHomedSocket
 	 * is actually an array.
 	 */
+	/* 根据创建的个数分配数组空间 */
 	CW_CREATE_ARRAY_ERR((sockPtr->interfaces), sockPtr->count, CWMultiHomedInterface,
 					return CWErrorRaise(CW_ERROR_OUT_OF_MEMORY, NULL););
 	
 	/* create array from list */
+	/* 把链表中的数据复制到数组中 */
 	for(el = interfaceList, i = 0; el != NULL; el = el->next, i++) {
 		CW_COPY_MH_INTERFACE_PTR(&((sockPtr->interfaces)[i]), ((CWMultiHomedInterface*)(el->data)));
 	}
 	
 	/* delete the list */
+	/* 释放临时链表 */
 	CWDeleteList(&interfaceList, CWNetworkDeleteMHInterface);
 	
 	return CW_TRUE;
@@ -560,6 +594,8 @@ CWBool CWNetworkUnsafeMultiHomed(CWMultiHomedSocket *sockPtr,
 	CWProtocolMessage* frame=NULL;
 	int dataSocket=0;
 	int readBytes;
+
+	/* 是否以MSG_PEEK方式接收报文 */
 	int flags = ((peekRead != CW_FALSE) ? MSG_PEEK : 0);	
 	char buf[CW_BUFFER_SIZE];
 	
@@ -713,6 +749,7 @@ CWBool CWNetworkUnsafeMultiHomed(CWMultiHomedSocket *sockPtr,
 				continue;
 			}
 			
+			/* 调用函数CWACManageIncomingPacket */
 			CWManageIncomingPacket(sockPtr->interfaces[i].sock, 
 					       buf, 
 					       readBytes,
@@ -770,6 +807,9 @@ int CWNetworkCountInterfaceAddresses(CWMultiHomedSocket *sockPtr) {
  * equivalent address for the interface at index i. If we are an IPv4 server,
  * addressesPtr are the IPv4 addresses and IPv4AddressesPtr is garbage.
  */
+/*
+获取接口的主ip地址
+*/
 CWBool CWNetworkGetInterfaceAddresses(CWMultiHomedSocket *sockPtr,
 				      CWNetworkLev4Address **addressesPtr,
 				      struct sockaddr_in **IPv4AddressesPtr) {

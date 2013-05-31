@@ -31,6 +31,9 @@
 
 #define CW_LIST_INIT		NULL
 
+/*
+单链表节点
+*/
 typedef struct _s {
 	void *data;
 	struct _s *next;
@@ -41,6 +44,9 @@ typedef enum {
 	CW_LIST_ITERATE
 } CWListIterateMode;
 
+/*
+链表节点指针
+*/
 typedef CWListElement *CWList;
 
 CWBool CWAddElementToList(CWList *list, void *element);

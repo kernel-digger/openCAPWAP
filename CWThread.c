@@ -680,6 +680,9 @@ void CWThreadSetSignals(int how, int num, ...) {
 
 
 // timers
+/*
+定时器回调函数的参数
+*/
 typedef struct {
  	CWThread *requestedThreadPtr;
  	int signalToRaise;
@@ -704,6 +707,10 @@ struct {
 	CWTimerID timerID;
 } gTimersData;
 
+/*
+定时器的回调函数
+向参数@arg中记录的线程发送指定的信号
+*/
 void CWHandleTimer(CWTimerArg arg) {
 	
 	CWThreadTimerArg *a = (CWThreadTimerArg*)arg;
@@ -728,7 +735,9 @@ CWBool CWTimerRequest(int sec, CWThread *threadPtr, CWTimerID *idPtr, int signal
 	
 	CW_CREATE_OBJECT_ERR(arg, CWThreadTimerArg, return CW_FALSE;);
 	CW_CREATE_OBJECT_ERR(arg->requestedThreadPtr, CWThread, CW_FREE_OBJECT(arg); return CW_FALSE;);
+	/* 记录线程号 */
  	CW_COPY_MEMORY(arg->requestedThreadPtr, threadPtr, sizeof(CWThread));
+	/* 定时器到时要向线程发送的信号 */
  	arg->signalToRaise = signalToRaise;
  			
 	CWDebugLog("Timer Request: thread(%d), signal(%d)", *(arg->requestedThreadPtr), arg->signalToRaise);

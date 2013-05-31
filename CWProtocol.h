@@ -118,6 +118,12 @@
 #define 	CW_TRANSPORT_HEADER_WBID_LEN				5
 
 // Format of the frame
+/*
+T: The Type 'T' bit indicates the format of the frame being
+      transported in the payload.  When this bit is set to one (1), the
+      payload has the native frame format indicated by the WBID field.
+      When this bit is zero (0), the payload is an IEEE 802.3 frame.
+*/
 #define 	CW_TRANSPORT_HEADER_T_START				23
 #define 	CW_TRANSPORT_HEADER_T_LEN				1
 
@@ -134,10 +140,14 @@
 #define 	CW_TRANSPORT_HEADER_W_LEN				1
 
 // Is the Radio MAC Address optional field present?
+/* 头部后是否包含(optional) Radio MAC Address地址，1包含 */
 #define 	CW_TRANSPORT_HEADER_M_START				27
 #define 	CW_TRANSPORT_HEADER_M_LEN				1
 
 // Is the message a keep alive?
+/* The Keep-Alive 'K' bit indicates the packet is a Data Channel Keep-Alive packet.
+标记是否为数据隧道心跳报文
+*/
 #define 	CW_TRANSPORT_HEADER_K_START				28
 #define 	CW_TRANSPORT_HEADER_K_LEN				1
 
@@ -340,7 +350,11 @@ typedef enum {
 
 typedef struct {
 	char *msg;
+	/* 1. msg的长度
+	   2. 已经解析到的位置
+	*/
 	int offset;
+	/* 函数CWParseTransportHeaderBinding */
 	int data_msgType; 
 } CWProtocolMessage;
 
@@ -373,6 +387,15 @@ typedef struct {
 	CWBindingTransportHeaderValues *bindingValuesPtr;
 } CWProtocolTransportHeaderValues;
 
+/*
+capwap控制报文头8个字节
+
+Message Type	: 4个字节
+Seq Num		: 1个字节
+Msg Element Length	: 2个字节
+Flags		: 1个字节
+
+*/
 typedef struct {
 	unsigned int messageTypeValue;
 	unsigned char seqNum;
@@ -446,9 +469,11 @@ typedef enum {
 } CWAuthSecurity;
 
 typedef struct {
+	/* 接口的ip地址 */
 	CWNetworkLev4Address addr;
 	struct sockaddr_in addrIPv4;
 
+	/* 该接口上连接的ap数 */
 	int WTPCount;
 } CWProtocolNetworkInterface;
 

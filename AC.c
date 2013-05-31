@@ -37,6 +37,9 @@
 
 /*_________________________________________________________*/
 /*  *******************___VARIABLES___*******************  */
+/*
+控制变量seqNum和fragID的互斥访问
+*/
 CWThreadMutex gCreateIDMutex;
 
 /* array that stores per WTPs infos */
@@ -60,6 +63,9 @@ int gWirelessField = 0;
 /* DTLS Policy for data channel */
 int gDTLSPolicy=DTLS_ENABLED_DATA;
 /* special socket to handle multiple network interfaces */
+/*
+记录创建的多个socket
+*/
 CWMultiHomedSocket gACSocket;
 /* AC's network interfaces */
 CWProtocolNetworkInterface *gInterfaces = NULL;
@@ -90,9 +96,14 @@ int main (int argc, const char * argv[]) {
 	if (argc <= 1)
 		printf("Usage: AC working_path\n");
 
+	/* 脱离控制终端，成为守护进程
+	   nochdir 1 - 不改变工作目录
+	   noclose 0 - 重定向0,1,2到/dev/null
+	*/
 	if (daemon(1, 0) < 0)
 		exit(1);
 
+	/* 依据命令行参数改变工作目录 */
 	if (chdir(argv[1]) != 0)
 		exit(1);
 	
@@ -146,6 +157,7 @@ void CWACInit() {
 
 	CWLog("Starting AC");
 
+	/* 阻塞SIGALRM信号，只有定时器线程使用该信号 */
 	CWThreadSetSignals(SIG_BLOCK, 1, SIGALRM);
 	if (timer_init() == 0) {
 		CWLog("Can't init timer module");

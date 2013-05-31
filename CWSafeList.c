@@ -168,16 +168,19 @@ CWBool CWAddElementToSafeListHead(CWSafeList safeList, void* pData, int nSize)
 void* CWGetHeadElementFromSafeList(CWSafeList safeList, int* pSize)
 {
 	CWPrivateSafeElement* pElement;
+	/* 链表 */
 	CWPrivateSafeList* pList = (CWPrivateSafeList*)safeList;
 
 	if ((pList == NULL) || (pList->pFirstElement == NULL))
 		return NULL;
 
+	/* 第一个节点 */
 	pElement = pList->pFirstElement;
 
 	if (pSize != NULL)
 		*pSize = pElement->nSize;
 
+	/* 返回第一个节点的数据指针 */
 	return pElement->pData;
 }
 

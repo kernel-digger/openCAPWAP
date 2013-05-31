@@ -46,7 +46,15 @@
 /*______________________________________________________*/
 /*  *******************___DEFINE___*******************  */
 #define CW_MAX_WTP				100
+/*
+注册函数CWCriticalTimerExpiredHandler
+标记当前CWManageWTP线程应该结束
+*/
 #define CW_CRITICAL_TIMER_EXPIRED_SIGNAL	SIGUSR2
+/*
+注册函数CWSoftTimerExpiredHandler
+控制报文的重传
+*/
 #define CW_SOFT_TIMER_EXPIRED_SIGNAL		SIGUSR1
 #define AC_LOG_FILE_NAME				"/var/log/ac.log.txt"
 #define MAC_ADDR_LEN		6
@@ -98,13 +106,25 @@ applicationsManager appsManager;
 /* 
  * Struct that describes a WTP from the AC's point of view 
  */
+/*
+维护每一台ap的信息
+每台ap对应一个结构体实例
+*/
 typedef struct {
+	/* ap的ip地址和端口号，作为关键字 */
 	CWNetworkLev4Address address;
+	/* 线程号 */
 	CWThread thread;
 	CWSecuritySession session;
 	CWBool isNotFree;
+	/* 标记线程CWManageWTP应该结束
+	   1. 重传次数达到最大值
+	   2. 检测到ap离线
+	*/
 	CWBool isRequestClose;
+	/* 记录ap当前状态 */
 	CWStateTransition currentState;
+	/* 在全局变量@gACSocket.interfaces[]数组中的下标 */
 	int interfaceIndex;
 	CWSocket socket;
 	char buf[CW_BUFFER_SIZE];
@@ -113,6 +133,7 @@ typedef struct {
 		CW_WAITING_REQUEST,
 		CW_COMPLETED,
 	} subState;		
+	/* 接收到的报文链表，指向一个CWPrivateSafeList结构体实例 */
 	CWSafeList packetReceiveList;
 	
 	/* depends on the current state: WaitJoin, NeighborDead */
@@ -126,6 +147,9 @@ typedef struct {
 	CWBool interfaceCommandProgress;
 	int interfaceCommand;
 	CWThreadMutex interfaceSingleton;
+	/* 控制互斥访问
+	   1. packetReceiveList字段的接收链表
+	*/
 	CWThreadMutex interfaceMutex;
 	CWThreadCondition interfaceWait;
 	CWThreadCondition interfaceComplete;

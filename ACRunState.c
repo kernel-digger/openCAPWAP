@@ -502,6 +502,7 @@ CWBool ACEnterRun(int WTPIndex, CWProtocolMessage *msgPtr, CWBool dataFlag) {
 			toSend = CW_TRUE;
 			break;
 		}
+		/* 收到ap的echo心跳报文 */
 		case CW_MSG_TYPE_VALUE_ECHO_REQUEST:
 		{
 			if(!(CWParseEchoRequestMessage(msgPtr, controlVal.msgElemsLen)))

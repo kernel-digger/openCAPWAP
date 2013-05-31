@@ -488,6 +488,9 @@ quit_manage:
  * CWManageApplication thread for every client connected.					*
  ****************************************************************************/
 
+/*
+进程间通信
+*/
 CW_THREAD_RETURN_TYPE CWInterface(void* arg)
 {
 	 

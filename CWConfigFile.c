@@ -47,6 +47,7 @@ char *CWFgets(char *buf, int bufSize, FILE *f) {
 	
 	CW_ZERO_MEMORY(buf, bufSize);
 	
+	/* 读取一行 */
 	do {
 		i++;
 		buf[i] = getc(f);
@@ -89,6 +90,7 @@ char * CWGetCommand(FILE *configFile) {
 	
 	CW_FREE_OBJECT(buff);
 	
+	/* 返回读取的一行信息，为动态申请的空间 */
 	return command;
 }
 
@@ -134,6 +136,7 @@ CWBool CWParseTheFile(CWBool isCount) {
 	gCWConfigFile = fopen (CW_CONFIG_FILE, "rb");
 	if (gCWConfigFile == NULL) CWErrorRaiseSystemError(CW_ERROR_GENERAL);
 	
+	/* 取一行 */
 	while((line = CWGetCommand(gCWConfigFile)) != NULL) {
 
 		int i, j;
@@ -142,10 +145,12 @@ CWBool CWParseTheFile(CWBool isCount) {
 		
 		for(i = 0; i < gConfigValuesCount; i++) {
 		
+			/* 开始标记一致 */
 			if(!strncmp(line, 
 				    gConfigValues[i].code,
 				    strlen(gConfigValues[i].code))) {
 		
+				/* 取到值的起始位置 */
 				char *myLine = line + strlen(gConfigValues[i].code);
 				
 				switch(gConfigValues[i].type) {
@@ -168,12 +173,14 @@ CWBool CWParseTheFile(CWBool isCount) {
 										 myLine, 
 										 return CWErrorRaise(CW_ERROR_OUT_OF_MEMORY, NULL););
 						break;
+					/* 如果是字符串数组 */
 					case CW_STRING_ARRAY:
 						#ifdef CW_DEBUGGING
 							CWDebugLog("*** Parsing String Array... *** \n");
 						#endif
 						j = 0;
 						CW_FREE_OBJECT(line);
+						/* 继续读取解析，直到结束标记 */
 						while((line = CWGetCommand(gCWConfigFile)) != NULL && strcmp(line, gConfigValues[i].endCode)) {
 							#ifdef CW_DEBUGGING
 								CWDebugLog("*** Parsing String (%s) *** \n", line);

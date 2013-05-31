@@ -38,10 +38,15 @@ static FILE *gLogFile = NULL;
 	CWThreadMutex gFileMutex;
 #endif
 
+/*
+创建日志文件
+*/
 void CWLogInitFile(char *fileName) {
 	if(fileName == NULL) {
 		CWLog("Wrong File Name for Log File");
 	}
+	
+	/* 清空或创建文件，从头开始写入 */
 	if((gLogFile = fopen(fileName, "w")) == NULL) {
 		CWLog("Can't open log file: %s", strerror(errno));
 		exit(1);

@@ -33,6 +33,7 @@
 
 typedef void* CWSafeList;
 
+/* 链表节点 */
 typedef struct _CWPrivateSafeElement
 {
 	void* pData;
@@ -42,11 +43,14 @@ typedef struct _CWPrivateSafeElement
 	struct _CWPrivateSafeElement* pNext;
 } CWPrivateSafeElement;
 
+/* 链表的控制节点 */
 typedef struct _CWPrivateSafeList
 {
+	/* 链表锁 */
 	CWThreadMutex* pThreadMutex;
 	CWThreadCondition* pThreadCond;
 
+	/* 链表中节点个数 */
 	unsigned long nCount;
 	CWPrivateSafeElement* pFirstElement;
 	CWPrivateSafeElement* pLastElement;

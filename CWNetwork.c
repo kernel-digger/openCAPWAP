@@ -56,6 +56,12 @@ __inline__ int CWNetworkGetAddressSize(CWNetworkLev4Address *addrPtr) {
 /* 
  * Send buf on an unconnected UDP socket. Unsafe means that we don't use DTLS.
  */
+/*
+@sock	:
+@addrPtr	: Ä¿µÄµØÖ·
+@buf	:
+@len	:
+*/
 CWBool CWNetworkSendUnsafeUnconnected(CWSocket sock, 
 				      CWNetworkLev4Address *addrPtr,
 				      const char *buf,

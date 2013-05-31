@@ -41,6 +41,10 @@
 /* microseconds in a millisecond */
 #define ALMOST_NOW	1000
 
+/*
+setitimer的定时器类型
+该类型发送SIGALRM信号
+*/
 #define TIMER_KIND	ITIMER_REAL
 #define SIG_TO_WAIT	SIGALRM
 
@@ -77,8 +81,10 @@ static void timer_dequeue(tl_timer_t * /*t*/);
 static void timer_start(struct timeval * /*abs_to*/);
 static void *cronometer(void * /*arg*/);
 			
+/* 定时器链表节点 */
 struct timer {
 
+	/* 绝对时间 */
 	struct timeval	timeout;
 	void(*handler)(void *);
 	void 		*handler_arg;
@@ -89,12 +95,16 @@ struct timer {
 	tl_timer_t 	*prev;
 };
 
+/*
+定时器链表
+*/
 static struct {
 
 	tl_timer_t 	*first;
 	tl_timer_t 	*last;
 	pthread_mutex_t mutex;
 	pthread_cond_t	cond;
+	/* 线程号 */
 	pthread_t	ticker;
 	int		cur_id;
 } timerq;
@@ -134,6 +144,10 @@ static void timer_dequeue(tl_timer_t *t) {
  * expire in 1 millisecond.
  * This function has to be called in a critical section.
  */
+/*
+调用setitimer函数发送SIGALRM信号
+该函数要在临界区内调用，即在锁控制下调用
+*/
 static void timer_start(struct timeval *abs_to) {
 
 	struct itimerval	relative = {{0,0},{0,0}};
@@ -157,6 +171,7 @@ static void timer_start(struct timeval *abs_to) {
 		relative.it_value.tv_usec = ALMOST_NOW;
 	}
 
+	/* 仅指定了it_value字段，为一次触发 */
 	rv = setitimer(TIMER_KIND, &relative, NULL);
 	if (rv == -1) {
 		/* This should never happen but I dont trust myself */
@@ -167,6 +182,9 @@ static void timer_start(struct timeval *abs_to) {
 	return;
 }
 
+/*
+定时器线程函数
+*/
 static void *cronometer(void *arg) {
 
 	void 		(*hdl)(void *);
@@ -175,6 +193,7 @@ static void *cronometer(void *arg) {
 	sigset_t	mask;
 	int		sig;
 
+	/* 只有定时器线程等待SIGALRM信号 */
 	sigemptyset(&mask);
 	sigaddset(&mask, SIG_TO_WAIT);
 
@@ -186,6 +205,7 @@ static void *cronometer(void *arg) {
 	pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
 
 	/* signal creator thread of succesful init */
+	/* 通知线程创建者 */
 	pthread_mutex_lock(&timerq.mutex);
 	pthread_cond_signal(&timerq.cond);
 	/* printf("\tTicker thread: inizializzaione compleata\n"); */
@@ -195,15 +215,21 @@ static void *cronometer(void *arg) {
 
 		pthread_mutex_lock(&timerq.mutex);
 
+		/* 定时器链表空，等待触发 */
 		while(timerq.first == NULL)
+			/* 调用pthread_cond_wait函数后，自动解锁，等待
+			   条件触发后自动加锁
+			*/
 			pthread_cond_wait(&timerq.cond, &timerq.mutex);
 
+		/* 依据链表第一个节点的到期时间，设置SIGALRM的触发时间 */
 		timer_start(&(timerq.first->timeout));
 		timerq.first->in_use = 1;
 		
 		pthread_mutex_unlock(&timerq.mutex);
 		
 		/* wait for a pending SIGALRM */
+		/* 等待SIGALRM信号 */
 		sigwait(&mask, &sig);
 		/* 
 		 * Poiche' un timer non puo' mai scadere prima del tempo 
@@ -240,6 +266,7 @@ static void *cronometer(void *arg) {
 		 */
 		pthread_mutex_unlock(&timerq.mutex);
 
+		/* 调用定时器的回调函数 */
 		hdl(hdl_arg);
 		/* reset cancel state (cancel type has not  been changed) */
 		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
@@ -252,6 +279,10 @@ static void *cronometer(void *arg) {
  * Initialize the timerq struct, spwan the ticker thread,
  * wait its initialization and return.
  */
+/*
+初始化全局变量timerq
+创建定时器线程
+*/
 int timer_init() {
 
 	int rv;
@@ -273,6 +304,7 @@ int timer_init() {
 
 	pthread_mutex_lock(&timerq.mutex);
 
+	/* 创建定时器线程 */
 	rv = pthread_create(&timerq.ticker, NULL, cronometer, NULL);
 	if (rv != 0) {
 		
@@ -286,6 +318,7 @@ int timer_init() {
 	ts.tv_sec = tv.tv_sec + INIT_WAIT_TIME;
 	ts.tv_nsec = tv.tv_usec * NANO_PER_MICRO;
 
+	/* 等待创建的线程cronometer触发 */
 	rv = pthread_cond_timedwait(&timerq.cond, &timerq.mutex, &ts);
 	if (rv != 0) {
 

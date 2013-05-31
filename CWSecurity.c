@@ -94,6 +94,14 @@ int psk_key2bn(const char *psk_key, unsigned char *psk, unsigned int max_psk_len
 								}					\
 							}
 
+/*
+openssl需要的锁回调函数
+
+@mode	: 加锁还是解锁
+@n	: 第几个锁
+@file	: 设置锁的文件，可用于调试
+@line	: 设置锁的行，可用于调试
+*/
 static void CWSslLockingFunc(int mode, int n, const char *file, int line) {
 
 	if (mode & CRYPTO_LOCK)
@@ -126,6 +134,9 @@ void CWSslCleanUp() {
 	return;
 }
 
+/*
+初始化openssl库
+*/
 CWBool CWSecurityInitLib() {
 
 	int i;
@@ -134,14 +145,18 @@ CWBool CWSecurityInitLib() {
 	SSL_library_init();
 
 	/* setup mutexes for openssl internal locking */
+	/* 分配锁空间 */
 	CW_CREATE_ARRAY_ERR(mutexOpensslBuf,
+				/* 根据openssl库需要的锁个数申请空间 */
 			    CRYPTO_num_locks() * sizeof(CWThreadMutex),
 			    CWThreadMutex,
 			    return CWErrorRaise(CW_ERROR_OUT_OF_MEMORY, 
 				    		"Cannot create openssl mutexes");)
 
+	/* 初始化为0 */
 	CW_ZERO_MEMORY(mutexOpensslBuf, CRYPTO_num_locks() * sizeof(CWThreadMutex));
 
+	/* 初始化各个锁 */
 	for(i = 0; i < CRYPTO_num_locks(); i++) {
 
 		CWBool rv;
@@ -154,7 +169,9 @@ CWBool CWSecurityInitLib() {
 		}
 	}
 
+	/* 设置线程id回调函数 */
 	CRYPTO_set_id_callback(CWSslIdFunction);
+	/* 设置锁的回调函数 */
 	CRYPTO_set_locking_callback(CWSslLockingFunc);
 
 	return CW_TRUE;
